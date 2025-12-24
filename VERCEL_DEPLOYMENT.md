@@ -1,12 +1,25 @@
 # Vercel 部署指南
 
-## 问题诊断
+## 问题诊断与修复
 
-如果 Vercel 部署成功但无法访问，通常是以下原因：
+已完成的修复：
 
-1. ✅ **缺少 vercel.json 配置** - 已修复
-2. ⚠️ **未设置环境变量** - 需要配置
-3. ⚠️ **路由配置问题** - 已通过 rewrites 修复
+1. ✅ **缺少 vercel.json 配置** - 已创建 SPA 路由配置
+2. ✅ **后端 API 依赖导致卡住** - 已添加超时和环境变量检查
+3. ✅ **路由配置问题** - 已通过 rewrites 修复
+
+## 核心问题说明
+
+原项目设计为前后端分离架构，包含：
+- 前端：React + Vite (存储在浏览器 localStorage)
+- 后端：Python FastAPI (可选的远程同步服务)
+
+在 Vercel 上仅部署前端时，应用会尝试连接后端 API（`http://localhost:8000`），导致页面加载卡住。
+
+**解决方案：**
+- 添加了环境变量检查，未配置 `VITE_API_URL` 时自动禁用远程存储
+- 添加了 3 秒超时机制，防止 API 请求阻塞应用
+- 应用可以完全独立运行，数据保存在浏览器本地
 
 ## 部署步骤
 
@@ -26,15 +39,16 @@ git push
 - 点击 "Settings" → "Environment Variables"
 - 添加以下环境变量：
 
-**必需的环境变量：**
+**可选的环境变量：**
+
+应用可以不设置任何环境变量直接运行（数据仅保存在浏览器本地）。
+
+如果需要启用远程同步功能，可配置：
 ```
-VITE_COPILOT_CLOUD_API_KEY=你的_copilotkit_api_key
+VITE_API_URL=你的后端API地址
 ```
 
-或者使用 OpenAI：
-```
-VITE_OPENAI_API_KEY=你的_openai_api_key
-```
+> 注意：CopilotKit 功能当前未激活，`VITE_COPILOT_CLOUD_API_KEY` 暂时不需要配置
 
 ### 3. 重新部署
 

@@ -27,8 +27,21 @@ export const deleteLocal = () => {
 };
 
 export const loadRemote = async (): Promise<ReportData | null> => {
+  // Skip remote loading if API URL is not configured
+  if (!import.meta.env.VITE_API_URL) {
+    console.info('Remote storage disabled: VITE_API_URL not configured');
+    return null;
+  }
+  
   try {
-    const res = await fetch(`${API_BASE}/report`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
+    const res = await fetch(`${API_BASE}/report`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    
     if (!res.ok) return null;
     const payload = await res.json();
     if (!payload?.data) return null;
@@ -40,20 +53,42 @@ export const loadRemote = async (): Promise<ReportData | null> => {
 };
 
 export const saveRemote = async (data: ReportData) => {
+  // Skip remote saving if API URL is not configured
+  if (!import.meta.env.VITE_API_URL) {
+    return;
+  }
+  
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
     await fetch(`${API_BASE}/report`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ data }),
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
   } catch (err) {
     console.warn('Save remote failed', err);
   }
 };
 
 export const deleteRemote = async () => {
+  // Skip remote deletion if API URL is not configured
+  if (!import.meta.env.VITE_API_URL) {
+    return;
+  }
+  
   try {
-    await fetch(`${API_BASE}/report`, { method: 'DELETE' });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
+    await fetch(`${API_BASE}/report`, { 
+      method: 'DELETE',
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
   } catch (err) {
     console.warn('Delete remote failed', err);
   }
