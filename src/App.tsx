@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react';
 import type { JSX } from 'react';
-import { Plus, RotateCcw, Trash2, CalendarPlus, Calculator, ListPlus, Info, FileDown, Eye, X, Edit2 } from 'lucide-react';
+import { Plus, RotateCcw, Trash2, CalendarPlus, Calculator, ListPlus, Info, FileDown, Eye, X } from 'lucide-react';
 import type { ReportData, CategoryGroup, CategoryType, ReportItem } from './types';
 import { defaultReport, loadLocal, loadRemote, saveLocal, saveRemote, deleteLocal, deleteRemote } from './utils/storage';
 import html2pdf from 'html2pdf.js';
@@ -284,46 +284,6 @@ function App() {
       items: remove(g.items),
     }));
     console.log('Item deleted');
-  };
-
-  const updateValue = (groupId: string, itemId: string, period: string, value: number) => {
-    if (!data) return;
-    const update = (items: ReportItem[]): ReportItem[] =>
-      items.map(it => {
-        if (it.id === itemId) {
-          const qty = it.quantities?.[period] ?? 1;
-          const unitPrices = { ...(it.unitPrices || {}) };
-          unitPrices[period] = Number.isNaN(value) ? 0 : value;
-          const values = { ...it.values, [period]: (Number.isNaN(value) ? 0 : value) * qty };
-          return { ...it, values, unitPrices };
-        }
-        return { ...it, children: it.children ? update(it.children) : it.children };
-      });
-
-    updateGroup(groupId, g => ({
-      ...g,
-      items: update(g.items),
-    }));
-  };
-
-  const updateQuantity = (groupId: string, itemId: string, period: string, quantity: number) => {
-    if (!data) return;
-    const update = (items: ReportItem[]): ReportItem[] =>
-      items.map(it => {
-        if (it.id === itemId) {
-          const unitPrice = it.unitPrices?.[period] ?? it.values[period] ?? 0;
-          const q = Number.isNaN(quantity) ? 0 : quantity;
-          const quantities = { ...(it.quantities || {}), [period]: q };
-          const values = { ...it.values, [period]: unitPrice * q };
-          return { ...it, quantities, values };
-        }
-        return { ...it, children: it.children ? update(it.children) : it.children };
-      });
-
-    updateGroup(groupId, g => ({
-      ...g,
-      items: update(g.items),
-    }));
   };
 
   const resetData = () => {
@@ -906,7 +866,6 @@ function App() {
                 <div className="mx-auto" style={{ width: '210mm' }}>
                   <div ref={pdfTemplateRef}>
                     <FinancialReportTemplate
-                      data={data}
                       viewMode={viewMode}
                       selectedPeriod={
                         viewMode === 'year' ? selectedYear 

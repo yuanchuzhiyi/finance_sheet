@@ -1,8 +1,7 @@
 import React from 'react';
-import type { ReportData, CategoryGroup, ReportItem } from '../types';
+import type { CategoryGroup, ReportItem } from '../types';
 
 interface FinancialReportTemplateProps {
-  data: ReportData;
   viewMode: 'year' | 'month' | 'day';
   selectedPeriod: string;
   displayGroups: CategoryGroup[];
@@ -15,7 +14,6 @@ interface FinancialReportTemplateProps {
 }
 
 export const FinancialReportTemplate: React.FC<FinancialReportTemplateProps> = ({
-  data,
   viewMode,
   selectedPeriod,
   displayGroups,
