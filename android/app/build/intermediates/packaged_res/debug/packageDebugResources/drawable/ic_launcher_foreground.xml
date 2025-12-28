@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="0.5"
+        android:scaleY="0.5"
+        android:translateX="27"
+        android:translateY="27">
+        <!-- Calculator/Finance icon -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,10C31.9,10,14,27.9,14,50s17.9,40,40,40s40-17.9,40-40S76.1,10,54,10z M54,82c-17.7,0-32-14.3-32-32s14.3-32,32-32s32,14.3,32,32S71.7,82,54,82z"/>
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M42,38h24c2.2,0,4,1.8,4,4v24c0,2.2-1.8,4-4,4H42c-2.2,0-4-1.8-4-4V42C38,39.8,39.8,38,42,38z M44,44v4h8v-4H44z M56,44v4h8v-4H56z M44,52v4h8v-4H44z M56,52v4h8v-4H56z M44,60v4h8v-4H44z M56,60v4h8v-4H56z"/>
+    </group>
+</vector>
