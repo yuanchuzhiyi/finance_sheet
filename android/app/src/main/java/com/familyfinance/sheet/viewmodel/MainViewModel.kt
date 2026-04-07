@@ -5,10 +5,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.familyfinance.sheet.data.local.DataStoreManager
 import com.familyfinance.sheet.data.model.CategoryGroup
+import com.familyfinance.sheet.data.model.MetricComparison
 import com.familyfinance.sheet.data.model.NoteItem
 import com.familyfinance.sheet.data.model.ReportData
 import com.familyfinance.sheet.data.model.ReportItem
 import com.familyfinance.sheet.data.model.Summary
+import com.familyfinance.sheet.data.model.SummaryComparison
 import com.familyfinance.sheet.data.model.ViewMode
 import com.familyfinance.sheet.data.repository.ReportRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +43,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _selectedDay = MutableStateFlow("")
     val selectedDay: StateFlow<String> = _selectedDay.asStateFlow()
     
+    // 对比周期
+    private val _comparisonPeriod = MutableStateFlow("")
+    val comparisonPeriod: StateFlow<String> = _comparisonPeriod.asStateFlow()
+    
     // 是否显示备注
     private val _showNotes = MutableStateFlow(false)
     val showNotes: StateFlow<Boolean> = _showNotes.asStateFlow()
@@ -70,6 +76,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         data.getSummary(mode, period)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Summary())
     
+    val comparisonOptions: StateFlow<List<String>> = combine(
+        reportData, viewMode, currentPeriod
+    ) { data, mode, period ->
+        data.getPeriods(mode).filter { it != period }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    
+    val summaryComparison: StateFlow<SummaryComparison?> = combine(
+        reportData, viewMode, currentPeriod, comparisonPeriod
+    ) { data, mode, period, comparison ->
+        data.getSummaryComparison(
+            viewMode = mode,
+            currentPeriod = period,
+            comparisonPeriod = comparison
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    
     // 显示的分组
     val displayGroups: StateFlow<List<CategoryGroup>> = combine(
         reportData, viewMode
@@ -82,13 +104,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             reportData.collect { data ->
                 if (_selectedYear.value.isEmpty() && data.years.isNotEmpty()) {
-                    _selectedYear.value = data.years.last()
+                    _selectedYear.value = data.years.maxOrNull().orEmpty()
                 }
                 if (_selectedMonth.value.isEmpty() && data.months.isNotEmpty()) {
-                    _selectedMonth.value = data.months.last()
+                    _selectedMonth.value = data.months.maxOrNull().orEmpty()
                 }
                 if (_selectedDay.value.isEmpty() && data.days.isNotEmpty()) {
-                    _selectedDay.value = data.days.last()
+                    _selectedDay.value = data.days.maxOrNull().orEmpty()
+                }
+                
+                // 如果数据中没有默认分组，自动创建并保存
+                val displayGroups = data.getDisplayGroups(_viewMode.value)
+                if (displayGroups.isEmpty()) {
+                    val updatedData = data.ensureDefaultGroups()
+                    if (updatedData != data) {
+                        repository.saveReportData(updatedData)
+                    }
+                }
+            }
+        }
+        
+        viewModelScope.launch {
+            combine(reportData, viewMode, currentPeriod) { data, mode, period ->
+                data.getPeriods(mode).filter { it != period }
+            }.collect { options ->
+                if (_comparisonPeriod.value !in options) {
+                    _comparisonPeriod.value = ""
                 }
             }
         }
@@ -117,6 +158,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // 选择日期
     fun selectDay(day: String) {
         _selectedDay.value = day
+    }
+    
+    fun selectComparisonPeriod(period: String) {
+        _comparisonPeriod.value = period
     }
     
     // 添加日期
@@ -176,7 +221,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // 添加科目
     fun addItem(groupId: String, name: String) {
         viewModelScope.launch {
-            val data = reportData.value
+            var data = reportData.value
+            // 确保数据中有默认分组，这样 updateGroup 才能找到它们
+            data = data.ensureDefaultGroups()
+            
             val allPeriods = data.years + data.months + data.days
             val newItem = ReportItem(
                 id = "${groupId}_${System.currentTimeMillis()}",
@@ -245,12 +293,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     // 更新科目备注
-    fun updateItemNote(groupId: String, itemId: String, note: String) {
+    fun updateItemNote(groupId: String, itemId: String, period: String, note: String) {
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
             val newData = data.updateGroup(groupId) { group ->
                 group.updateItem(itemId) { item ->
-                    item.updateNote(note)
+                    item.updateNote(period, note)
                 }
             }
             repository.saveReportData(newData)
@@ -258,7 +307,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     // 添加附注
-    fun addNote() {
+    fun addNote(period: String) {
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
             val newNote = NoteItem(
@@ -266,16 +316,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 label = "",
                 value = ""
             )
-            val newData = data.addNote(newNote)
+            val newData = data.addNote(period, newNote)
             repository.saveReportData(newData)
         }
     }
     
     // 更新附注
-    fun updateNote(noteId: String, label: String, value: String) {
+    fun updateNote(period: String, noteId: String, label: String, value: String) {
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val newData = data.updateNote(noteId) { note ->
+            val newData = data.updateNote(period, noteId) { note ->
                 note.copy(label = label, value = value)
             }
             repository.saveReportData(newData)
@@ -283,18 +334,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     
     // 删除附注
-    fun deleteNote(noteId: String) {
+    fun deleteNote(period: String, noteId: String) {
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val newData = data.removeNote(noteId)
+            val newData = data.removeNote(period, noteId)
             repository.saveReportData(newData)
-        }
-    }
-    
-    // 保存报表
-    fun saveReport() {
-        viewModelScope.launch {
-            repository.saveReportData(reportData.value)
         }
     }
     
@@ -302,6 +347,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun resetReport() {
         viewModelScope.launch {
             repository.resetToDefault()
+            _selectedYear.value = ""
+            _selectedMonth.value = ""
+            _selectedDay.value = ""
+            _comparisonPeriod.value = ""
         }
     }
     
@@ -309,6 +358,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun deleteReport() {
         viewModelScope.launch {
             repository.deleteReport()
+            _selectedYear.value = ""
+            _selectedMonth.value = ""
+            _selectedDay.value = ""
+            _comparisonPeriod.value = ""
         }
     }
 }

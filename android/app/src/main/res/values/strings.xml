@@ -34,9 +34,19 @@
     <string name="reset_template">重置模板</string>
     <string name="save_report">保存报表</string>
     <string name="delete_report">删除报表</string>
-    <string name="preview_pdf">预览PDF</string>
+    <string name="preview_pdf">打开PDF</string>
     <string name="export_pdf">导出PDF</string>
     <string name="toggle_notes">展开/折叠备注</string>
+    <string name="compare_period">对比周期：</string>
+    <string name="no_comparison">不对比</string>
+    <string name="auto_save_hint">修改会自动保存，无需手动点保存。</string>
+    <string name="date_focus_title">日期聚焦</string>
+    <string name="date_focus_all">当前查看全部日期</string>
+    <string name="date_focus_selected">当前仅查看 %s</string>
+    <string name="focus_date">选择日期</string>
+    <string name="show_all_dates">查看全部</string>
+    <string name="quick_date_filter">单日</string>
+    <string name="empty_selected_date">所选日期暂无账单，试试切换到全部日期。</string>
     
     <!-- Dialogs -->
     <string name="input_date_hint">输入新日期 (格式: 2025-12-01)</string>
@@ -62,6 +72,7 @@
     <!-- Notes Section -->
     <string name="notes_section">其他信息 / 附注</string>
     <string name="notes_hint">暂无附注，可用来记录养老保险缴纳额等信息。</string>
+    <string name="notes_period_required">请先选择或创建一个周期，再为该周期添加附注。</string>
     <string name="add_note">新增附注</string>
     <string name="note_label_hint">标题…</string>
     <string name="note_value_hint">内容…</string>

@@ -18,11 +18,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.familyfinance.sheet.data.model.MetricComparison
 import com.familyfinance.sheet.ui.theme.Amber600
 import com.familyfinance.sheet.ui.theme.Emerald600
 import com.familyfinance.sheet.ui.theme.Indigo600
 import com.familyfinance.sheet.ui.theme.Rose600
 import java.text.NumberFormat
+import java.util.Currency
 import java.util.Locale
 
 /**
@@ -33,6 +35,8 @@ fun SummaryCard(
     title: String,
     value: Double,
     accentColor: Color,
+    comparison: MetricComparison? = null,
+    comparisonLabel: String? = null,
     icon: ImageVector? = null,
     modifier: Modifier = Modifier
 ) {
@@ -77,8 +81,31 @@ fun SummaryCard(
                     )
                 }
             }
+            if (comparison != null && !comparisonLabel.isNullOrBlank()) {
+                Text(
+                    text = buildComparisonText(comparisonLabel, comparison),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = CategoryColors.getPositiveNegativeColor(comparison.delta),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
         }
     }
+}
+
+private fun buildComparisonText(label: String, comparison: MetricComparison): String {
+    val amountFormatter = NumberFormat.getCurrencyInstance(Locale.CHINA).apply {
+        currency = Currency.getInstance("CNY")
+        maximumFractionDigits = 2
+    }
+    val percentText = comparison.percentChange?.let {
+        NumberFormat.getPercentInstance(Locale.CHINA).apply {
+            minimumFractionDigits = 0
+            maximumFractionDigits = 2
+        }.format(it)
+    } ?: "--"
+    val sign = if (comparison.delta > 0) "+" else ""
+    return "较 $label ${sign}${amountFormatter.format(comparison.delta)} / $percentText"
 }
 
 /**

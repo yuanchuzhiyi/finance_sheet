@@ -27,6 +27,9 @@ fun PeriodDropdown(
     periods: List<String>,
     selectedPeriod: String,
     onPeriodChange: (String) -> Unit,
+    emptyLabel: String = "选择",
+    includeEmptyOption: Boolean = false,
+    emptyOptionText: String = emptyLabel,
     modifier: Modifier = Modifier
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -37,7 +40,7 @@ fun PeriodDropdown(
         ) {
             Row {
                 Text(
-                    text = selectedPeriod.ifEmpty { "选择" },
+                    text = selectedPeriod.ifEmpty { emptyLabel },
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Icon(
@@ -52,6 +55,15 @@ fun PeriodDropdown(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
+            if (includeEmptyOption) {
+                DropdownMenuItem(
+                    text = { Text(emptyOptionText) },
+                    onClick = {
+                        onPeriodChange("")
+                        expanded = false
+                    }
+                )
+            }
             periods.forEach { period ->
                 DropdownMenuItem(
                     text = { Text(period) },

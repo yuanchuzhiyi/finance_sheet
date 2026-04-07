@@ -11,7 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -20,14 +19,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.familyfinance.sheet.R
 import com.familyfinance.sheet.data.model.CategoryGroup
 import com.familyfinance.sheet.data.model.CategoryType
+import com.familyfinance.sheet.data.model.MetricComparison
 import com.familyfinance.sheet.data.model.ReportItem
+import com.familyfinance.sheet.data.model.compareMetric
 import com.familyfinance.sheet.ui.theme.Amber50
 import com.familyfinance.sheet.ui.theme.Amber600
 import com.familyfinance.sheet.ui.theme.Emerald50
@@ -37,6 +37,7 @@ import com.familyfinance.sheet.ui.theme.Indigo600
 import com.familyfinance.sheet.ui.theme.Rose50
 import com.familyfinance.sheet.ui.theme.Rose600
 import java.text.NumberFormat
+import java.util.Currency
 import java.util.Locale
 
 /**
@@ -46,6 +47,7 @@ import java.util.Locale
 fun CategoryGroupSection(
     group: CategoryGroup,
     period: String,
+    comparisonPeriod: String,
     showNotes: Boolean,
     onAddItem: () -> Unit,
     onValueChange: (String, Double) -> Unit,
@@ -57,18 +59,18 @@ fun CategoryGroupSection(
 ) {
     val (bgColor, accentColor) = when (group.type) {
         CategoryType.INCOME -> Emerald50 to Emerald600
-        CategoryType.EXPENSE -> Rose50 to Rose606
+        CategoryType.EXPENSE -> Rose50 to Rose600
         CategoryType.ASSET -> Indigo50 to Indigo600
-        CategoryType.LIABILITY -> Amber50 to Amber606
+        CategoryType.LIABILITY -> Amber50 to Amber600
     }
-    
+
     val categoryLabel = when (group.type) {
         CategoryType.INCOME -> stringResource(R.string.income)
         CategoryType.EXPENSE -> stringResource(R.string.expense)
         CategoryType.ASSET -> stringResource(R.string.asset)
         CategoryType.LIABILITY -> stringResource(R.string.liability)
     }
-    
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -78,7 +80,6 @@ fun CategoryGroupSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column {
-            // 分组标题
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -87,7 +88,7 @@ fun CategoryGroupSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = categoryLabel,
                         style = MaterialTheme.typography.titleSmall,
@@ -100,17 +101,19 @@ fun CategoryGroupSection(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                TextButton(onClick = onAddItem) {
+                TextButton(
+                    onClick = onAddItem,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = null,
+                        contentDescription = "新增科目",
                         modifier = Modifier.padding(end = 4.dp)
                     )
                     Text(stringResource(R.string.add_item))
                 }
             }
-            
-            // 表头
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -144,8 +147,7 @@ fun CategoryGroupSection(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
-            // 科目列表
+
             group.items.forEachIndexed { index, item ->
                 RenderItemWithChildren(
                     item = item,
@@ -170,16 +172,22 @@ fun CategoryGroupSection(
                     )
                 }
             }
-            
-            // 小计
+
             val total = group.getTotal(period)
             val formattedTotal = NumberFormat.getNumberInstance(Locale.CHINA).format(total)
+            val comparison = comparisonPeriod.takeIf { it.isNotBlank() }?.let {
+                compareMetric(
+                    currentValue = total,
+                    comparisonValue = group.getTotal(it)
+                )
+            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = stringResource(R.string.subtotal),
@@ -187,20 +195,40 @@ fun CategoryGroupSection(
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Text(
-                    text = "¥ $formattedTotal",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = "¥ $formattedTotal",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    if (comparison != null) {
+                        Text(
+                            text = buildComparisonText(comparisonPeriod, comparison),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = CategoryColors.getPositiveNegativeColor(comparison.delta)
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-// Fix color references
-private val Rose606 = Rose600
-private val Amber606 = Amber600
+private fun buildComparisonText(label: String, comparison: MetricComparison): String {
+    val amountFormatter = NumberFormat.getCurrencyInstance(Locale.CHINA).apply {
+        currency = Currency.getInstance("CNY")
+        maximumFractionDigits = 2
+    }
+    val percentText = comparison.percentChange?.let {
+        NumberFormat.getPercentInstance(Locale.CHINA).apply {
+            minimumFractionDigits = 0
+            maximumFractionDigits = 2
+        }.format(it)
+    } ?: "--"
+    val sign = if (comparison.delta > 0) "+" else ""
+    return "较 $label ${sign}${amountFormatter.format(comparison.delta)} / $percentText"
+}
 
 @Composable
 private fun RenderItemWithChildren(
@@ -231,7 +259,7 @@ private fun RenderItemWithChildren(
             onAddSubItem = onAddSubItem,
             onDelete = onDelete
         )
-        
+
         item.children?.forEach { child ->
             HorizontalDivider(
                 color = MaterialTheme.colorScheme.outlineVariant,

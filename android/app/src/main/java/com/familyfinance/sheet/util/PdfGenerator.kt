@@ -13,7 +13,9 @@ import androidx.core.content.FileProvider
 import com.familyfinance.sheet.data.model.CategoryGroup
 import com.familyfinance.sheet.data.model.CategoryType
 import com.familyfinance.sheet.data.model.ReportData
+import com.familyfinance.sheet.data.model.ReportItem
 import com.familyfinance.sheet.data.model.Summary
+import com.familyfinance.sheet.data.model.SummaryComparison
 import com.familyfinance.sheet.data.model.ViewMode
 import java.io.File
 import java.io.FileOutputStream
@@ -86,7 +88,9 @@ class PdfGenerator(private val context: Context) {
         reportData: ReportData,
         viewMode: ViewMode,
         period: String,
-        summary: Summary
+        summary: Summary,
+        comparisonPeriod: String = "",
+        summaryComparison: SummaryComparison? = null
     ): File? {
         val document = PdfDocument()
         
@@ -112,7 +116,14 @@ class PdfGenerator(private val context: Context) {
             yPos += 40f
             
             // 绘制汇总区域
-            yPos = drawSummarySection(canvas, yPos, viewMode, summary)
+            yPos = drawSummarySection(
+                canvas = canvas,
+                startY = yPos,
+                viewMode = viewMode,
+                summary = summary,
+                comparisonPeriod = comparisonPeriod,
+                summaryComparison = summaryComparison
+            )
             yPos += 20f
             
             // 绘制分组数据
@@ -148,11 +159,20 @@ class PdfGenerator(private val context: Context) {
     /**
      * 绘制汇总区域
      */
-    private fun drawSummarySection(canvas: Canvas, startY: Float, viewMode: ViewMode, summary: Summary): Float {
+    private fun drawSummarySection(
+        canvas: Canvas,
+        startY: Float,
+        viewMode: ViewMode,
+        summary: Summary,
+        comparisonPeriod: String,
+        summaryComparison: SummaryComparison?
+    ): Float {
         var yPos = startY
+        val hasComparison = comparisonPeriod.isNotBlank() && summaryComparison != null
+        val sectionHeight = if (hasComparison) 125f else 80f
         
         // 背景
-        canvas.drawRect(margin, yPos, pageWidth - margin, yPos + 80f, summaryBgPaint)
+        canvas.drawRect(margin, yPos, pageWidth - margin, yPos + sectionHeight, summaryBgPaint)
         
         yPos += 20f
         
@@ -175,6 +195,23 @@ class PdfGenerator(private val context: Context) {
             canvas.drawText("¥ ${numberFormat.format(summary.netWorth)}", margin + 250f, yPos + 14f, valuePaint.apply {
                 color = netWorthColor
             })
+            
+            if (hasComparison) {
+                yPos += 30f
+                textPaint.color = Color.parseColor("#475569")
+                canvas.drawText(
+                    "较 $comparisonPeriod：资产 ${formatDelta(summaryComparison!!.asset.delta, summaryComparison.asset.percentChange)}",
+                    margin + 10f,
+                    yPos + 12f,
+                    textPaint
+                )
+                canvas.drawText(
+                    "净资产 ${formatDelta(summaryComparison.netWorth.delta, summaryComparison.netWorth.percentChange)}",
+                    margin + 280f,
+                    yPos + 12f,
+                    textPaint
+                )
+            }
         } else {
             // 利润表汇总
             canvas.drawText("本期收入", margin + 10f, yPos + 14f, headerPaint)
@@ -194,9 +231,26 @@ class PdfGenerator(private val context: Context) {
             canvas.drawText("¥ ${numberFormat.format(summary.cashflow)}", margin + 250f, yPos + 14f, valuePaint.apply {
                 color = profitColor
             })
+            
+            if (hasComparison) {
+                yPos += 30f
+                textPaint.color = Color.parseColor("#475569")
+                canvas.drawText(
+                    "较 $comparisonPeriod：收入 ${formatDelta(summaryComparison!!.income.delta, summaryComparison.income.percentChange)}",
+                    margin + 10f,
+                    yPos + 12f,
+                    textPaint
+                )
+                canvas.drawText(
+                    "结余 ${formatDelta(summaryComparison.cashflow.delta, summaryComparison.cashflow.percentChange)}",
+                    margin + 280f,
+                    yPos + 12f,
+                    textPaint
+                )
+            }
         }
         
-        return startY + 90f
+        return startY + sectionHeight + 10f
     }
     
     /**
@@ -237,20 +291,7 @@ class PdfGenerator(private val context: Context) {
         
         // 科目列表
         for (item in group.items) {
-            val value = item.getValue(period)
-            canvas.drawText(item.name, margin, yPos + 12f, textPaint)
-            canvas.drawText("¥ ${numberFormat.format(value)}", pageWidth - margin, yPos + 12f, valuePaint.apply {
-                color = Color.parseColor("#1E293B")
-            })
-            yPos += 18f
-            
-            // 子科目
-            item.children?.forEach { child ->
-                val childValue = child.getValue(period)
-                canvas.drawText("  └ ${child.name}", margin, yPos + 12f, textPaint)
-                canvas.drawText("¥ ${numberFormat.format(childValue)}", pageWidth - margin, yPos + 12f, valuePaint)
-                yPos += 18f
-            }
+            yPos = drawReportItem(canvas, item, period, yPos, depth = 0)
         }
         
         // 小计
@@ -263,6 +304,32 @@ class PdfGenerator(private val context: Context) {
         canvas.drawText("¥ ${numberFormat.format(total)}", pageWidth - margin, yPos + 14f, valuePaint)
         
         return yPos + 20f
+    }
+    
+    private fun drawReportItem(
+        canvas: Canvas,
+        item: ReportItem,
+        period: String,
+        startY: Float,
+        depth: Int
+    ): Float {
+        var yPos = startY
+        val labelX = margin + depth * 16f
+        val prefix = if (depth == 0) "" else "└ "
+        val value = item.getValue(period)
+        canvas.drawText("${prefix}${item.name}", labelX, yPos + 12f, textPaint)
+        canvas.drawText(
+            "¥ ${numberFormat.format(value)}",
+            pageWidth - margin,
+            yPos + 12f,
+            valuePaint.apply { color = Color.parseColor("#1E293B") }
+        )
+        yPos += 18f
+        
+        item.children?.forEach { child ->
+            yPos = drawReportItem(canvas, child, period, yPos, depth + 1)
+        }
+        return yPos
     }
     
     /**
@@ -296,5 +363,16 @@ class PdfGenerator(private val context: Context) {
             setDataAndType(uri, "application/pdf")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
+    }
+    
+    private fun formatDelta(delta: Double, percent: Double?): String {
+        val sign = if (delta > 0) "+" else ""
+        val percentText = percent?.let {
+            NumberFormat.getPercentInstance(Locale.CHINA).apply {
+                minimumFractionDigits = 0
+                maximumFractionDigits = 2
+            }.format(it)
+        } ?: "--"
+        return "${sign}${numberFormat.format(delta)} / $percentText"
     }
 }

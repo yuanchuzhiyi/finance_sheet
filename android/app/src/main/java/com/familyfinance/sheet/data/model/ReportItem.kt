@@ -9,7 +9,8 @@ import kotlinx.serialization.Serializable
  * @property values 按日期存储金额，key 例如 '2025-01-01'
  * @property quantities 数量，按周期
  * @property unitPrices 单价，按周期
- * @property note 备注
+ * @property notesByPeriod 按周期存储备注
+ * @property note 旧版共享备注，保留用于兼容历史数据
  * @property children 子科目，支持分层汇总
  */
 @Serializable
@@ -19,6 +20,7 @@ data class ReportItem(
     val values: Map<String, Double> = emptyMap(),
     val quantities: Map<String, Double> = emptyMap(),
     val unitPrices: Map<String, Double> = emptyMap(),
+    val notesByPeriod: Map<String, String> = emptyMap(),
     val note: String? = null,
     val children: List<ReportItem>? = null
 ) {
@@ -49,10 +51,25 @@ data class ReportItem(
     }
     
     /**
-     * 更新备注
+     * 获取指定周期的备注。
+     * 新版优先读周期备注；旧数据回退到共享备注。
      */
-    fun updateNote(newNote: String): ReportItem {
-        return copy(note = newNote)
+    fun getNote(period: String): String {
+        return if (notesByPeriod.containsKey(period)) {
+            notesByPeriod[period].orEmpty()
+        } else {
+            note.orEmpty()
+        }
+    }
+    
+    /**
+     * 更新指定周期的备注
+     */
+    fun updateNote(period: String, newNote: String): ReportItem {
+        val updatedNotes = notesByPeriod.toMutableMap().apply {
+            this[period] = newNote
+        }
+        return copy(notesByPeriod = updatedNotes)
     }
     
     /**

@@ -37,9 +37,9 @@ class ReportRepository(private val dataStoreManager: DataStoreManager) {
     }
     
     /**
-     * 删除报表（重置为默认）
+     * 删除报表（只清除报表数据，保留记账簿数据）
      */
     suspend fun deleteReport() {
-        resetToDefault()
+        dataStoreManager.clearReportData()
     }
 }

@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -82,7 +81,10 @@ fun MainScreen(
     val selectedMonth by viewModel.selectedMonth.collectAsState()
     val selectedDay by viewModel.selectedDay.collectAsState()
     val currentPeriod by viewModel.currentPeriod.collectAsState()
+    val comparisonPeriod by viewModel.comparisonPeriod.collectAsState()
+    val comparisonOptions by viewModel.comparisonOptions.collectAsState()
     val summary by viewModel.summary.collectAsState()
+    val summaryComparison by viewModel.summaryComparison.collectAsState()
     val displayGroups by viewModel.displayGroups.collectAsState()
     val showNotes by viewModel.showNotes.collectAsState()
     
@@ -113,7 +115,9 @@ fun MainScreen(
                     reportData = reportData,
                     viewMode = viewMode,
                     period = currentPeriod,
-                    summary = summary
+                    summary = summary,
+                    comparisonPeriod = comparisonPeriod,
+                    summaryComparison = summaryComparison
                 )
             }
             
@@ -207,16 +211,7 @@ fun MainScreen(
                         Icon(Icons.Default.Refresh, null, Modifier.padding(end = 4.dp))
                         Text(stringResource(R.string.reset_template))
                     }
-                    OutlinedButton(onClick = {
-                        viewModel.saveReport()
-                        scope.launch {
-                            snackbarHostState.showSnackbar("报表已保存")
-                        }
-                    }) {
-                        Icon(Icons.Default.Save, null, Modifier.padding(end = 4.dp))
-                        Text(stringResource(R.string.save_report))
-                    }
-                    // PDF 预览按钮
+                    // PDF 打开按钮
                     OutlinedButton(onClick = { exportPdf(openAfterExport = true) }) {
                         Icon(Icons.Default.PictureAsPdf, null, Modifier.padding(end = 4.dp))
                         Text(stringResource(R.string.preview_pdf))
@@ -237,6 +232,14 @@ fun MainScreen(
                     }
                 }
             }
+
+            item {
+                Text(
+                    text = stringResource(R.string.auto_save_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             
             // 汇总卡片
             item {
@@ -250,6 +253,8 @@ fun MainScreen(
                             title = stringResource(R.string.total_asset),
                             value = summary.asset,
                             accentColor = CategoryColors.asset,
+                            comparison = summaryComparison?.asset,
+                            comparisonLabel = comparisonPeriod,
                             icon = Icons.Default.Calculate,
                             modifier = Modifier.weight(1f)
                         )
@@ -257,6 +262,8 @@ fun MainScreen(
                             title = stringResource(R.string.total_liability),
                             value = summary.liability,
                             accentColor = CategoryColors.liability,
+                            comparison = summaryComparison?.liability,
+                            comparisonLabel = comparisonPeriod,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -265,6 +272,8 @@ fun MainScreen(
                         title = stringResource(R.string.net_worth),
                         value = summary.netWorth,
                         accentColor = CategoryColors.getPositiveNegativeColor(summary.netWorth),
+                        comparison = summaryComparison?.netWorth,
+                        comparisonLabel = comparisonPeriod,
                         modifier = Modifier.fillMaxWidth()
                     )
                 } else {
@@ -277,6 +286,8 @@ fun MainScreen(
                             title = stringResource(R.string.period_income),
                             value = summary.income,
                             accentColor = CategoryColors.income,
+                            comparison = summaryComparison?.income,
+                            comparisonLabel = comparisonPeriod,
                             icon = Icons.Default.Calculate,
                             modifier = Modifier.weight(1f)
                         )
@@ -284,6 +295,8 @@ fun MainScreen(
                             title = stringResource(R.string.period_expense),
                             value = summary.expense,
                             accentColor = CategoryColors.expense,
+                            comparison = summaryComparison?.expense,
+                            comparisonLabel = comparisonPeriod,
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -292,6 +305,8 @@ fun MainScreen(
                         title = stringResource(R.string.period_profit),
                         value = summary.cashflow,
                         accentColor = CategoryColors.getPositiveNegativeColor(summary.cashflow),
+                        comparison = summaryComparison?.cashflow,
+                        comparisonLabel = comparisonPeriod,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -322,17 +337,17 @@ fun MainScreen(
                     ) {
                         when (viewMode) {
                             ViewMode.YEAR -> PeriodDropdown(
-                                periods = reportData.years,
+                                periods = reportData.getPeriods(ViewMode.YEAR),
                                 selectedPeriod = selectedYear,
                                 onPeriodChange = { viewModel.selectYear(it) }
                             )
                             ViewMode.MONTH -> PeriodDropdown(
-                                periods = reportData.months,
+                                periods = reportData.getPeriods(ViewMode.MONTH),
                                 selectedPeriod = selectedMonth,
                                 onPeriodChange = { viewModel.selectMonth(it) }
                             )
                             ViewMode.DAY -> PeriodDropdown(
-                                periods = reportData.days,
+                                periods = reportData.getPeriods(ViewMode.DAY),
                                 selectedPeriod = selectedDay,
                                 onPeriodChange = { viewModel.selectDay(it) }
                             )
@@ -340,6 +355,27 @@ fun MainScreen(
                         
                         OutlinedButton(onClick = { viewModel.toggleShowNotes() }) {
                             Text(if (showNotes) "折叠备注" else "展开备注")
+                        }
+                    }
+                    
+                    if (currentPeriod.isNotBlank()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stringResource(R.string.compare_period),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            PeriodDropdown(
+                                periods = comparisonOptions,
+                                selectedPeriod = comparisonPeriod,
+                                onPeriodChange = { viewModel.selectComparisonPeriod(it) },
+                                emptyLabel = stringResource(R.string.no_comparison),
+                                includeEmptyOption = true,
+                                emptyOptionText = stringResource(R.string.no_comparison)
+                            )
                         }
                     }
                 }
@@ -350,13 +386,14 @@ fun MainScreen(
                 CategoryGroupSection(
                     group = group,
                     period = currentPeriod,
+                    comparisonPeriod = comparisonPeriod,
                     showNotes = showNotes,
                     onAddItem = { showAddItemDialog = group.id },
                     onValueChange = { itemId, value ->
                         viewModel.updateItemValue(group.id, itemId, currentPeriod, value)
                     },
                     onNoteChange = { itemId, note ->
-                        viewModel.updateItemNote(group.id, itemId, note)
+                        viewModel.updateItemNote(group.id, itemId, currentPeriod, note)
                     },
                     onRenameItem = { itemId ->
                         val item = findItem(group.items, itemId)
@@ -379,12 +416,14 @@ fun MainScreen(
             // 附注区域
             item {
                 NotesSection(
-                    notes = reportData.notes,
-                    onAddNote = { viewModel.addNote() },
+                    currentPeriod = currentPeriod,
+                    notes = if (currentPeriod.isNotBlank()) reportData.getNotes(currentPeriod) else emptyList(),
+                    enabled = currentPeriod.isNotBlank(),
+                    onAddNote = { viewModel.addNote(currentPeriod) },
                     onUpdateNote = { noteId, label, value ->
-                        viewModel.updateNote(noteId, label, value)
+                        viewModel.updateNote(currentPeriod, noteId, label, value)
                     },
-                    onDeleteNote = { viewModel.deleteNote(it) }
+                    onDeleteNote = { viewModel.deleteNote(currentPeriod, it) }
                 )
             }
         }
@@ -456,8 +495,20 @@ fun MainScreen(
             title = stringResource(R.string.delete_report),
             message = stringResource(R.string.confirm_delete),
             onConfirm = {
+                val periodText = if (currentPeriod.isNotEmpty()) {
+                    when (viewMode) {
+                        ViewMode.YEAR -> "年份 $currentPeriod"
+                        ViewMode.MONTH -> "月份 $currentPeriod"
+                        ViewMode.DAY -> "日期 $currentPeriod"
+                    }
+                } else {
+                    "所有报表"
+                }
                 viewModel.deleteReport()
                 showDeleteDialog = false
+                scope.launch {
+                    snackbarHostState.showSnackbar("报表已删除：$periodText")
+                }
             },
             onDismiss = { showDeleteDialog = false }
         )

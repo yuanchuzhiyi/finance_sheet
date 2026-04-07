@@ -21,9 +21,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,13 +39,16 @@ import com.familyfinance.sheet.data.model.NoteItem
 import com.familyfinance.sheet.ui.theme.Indigo500
 import com.familyfinance.sheet.ui.theme.Rose500
 import com.familyfinance.sheet.ui.theme.Slate50
+import kotlinx.coroutines.delay
 
 /**
  * 附注区域组件
  */
 @Composable
 fun NotesSection(
+    currentPeriod: String,
     notes: List<NoteItem>,
+    enabled: Boolean,
     onAddNote: () -> Unit,
     onUpdateNote: (String, String, String) -> Unit,
     onDeleteNote: (String) -> Unit,
@@ -81,8 +87,18 @@ fun NotesSection(
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
+                    if (currentPeriod.isNotBlank()) {
+                        Text(
+                            text = currentPeriod,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
-                TextButton(onClick = onAddNote) {
+                TextButton(
+                    onClick = onAddNote,
+                    enabled = enabled
+                ) {
                     Icon(
                         imageVector = Icons.Default.Add,
                         contentDescription = null,
@@ -95,7 +111,11 @@ fun NotesSection(
             // 附注列表
             if (notes.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.notes_hint),
+                    text = if (enabled) {
+                        stringResource(R.string.notes_hint)
+                    } else {
+                        stringResource(R.string.notes_period_required)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(16.dp)
@@ -104,8 +124,9 @@ fun NotesSection(
                 notes.forEachIndexed { index, note ->
                     NoteItemRow(
                         note = note,
-                        onLabelChange = { newLabel -> onUpdateNote(note.id, newLabel, note.value) },
-                        onValueChange = { newValue -> onUpdateNote(note.id, note.label, newValue) },
+                        onNoteChange = { newLabel, newValue ->
+                            onUpdateNote(note.id, newLabel, newValue)
+                        },
                         onDelete = { onDeleteNote(note.id) }
                     )
                     if (index < notes.size - 1) {
@@ -123,12 +144,30 @@ fun NotesSection(
 @Composable
 private fun NoteItemRow(
     note: NoteItem,
-    onLabelChange: (String) -> Unit,
-    onValueChange: (String) -> Unit,
+    onNoteChange: (String, String) -> Unit,
     onDelete: () -> Unit
 ) {
-    var labelText by remember(note.label) { mutableStateOf(note.label) }
-    var valueText by remember(note.value) { mutableStateOf(note.value) }
+    var labelText by remember(note.id, note.label) { mutableStateOf(note.label) }
+    var valueText by remember(note.id, note.value) { mutableStateOf(note.value) }
+
+    LaunchedEffect(labelText, valueText, note.label, note.value) {
+        delay(400)
+        if (labelText != note.label || valueText != note.value) {
+            onNoteChange(labelText, valueText)
+        }
+    }
+
+    val latestLabelText by rememberUpdatedState(labelText)
+    val latestValueText by rememberUpdatedState(valueText)
+    val latestLabel by rememberUpdatedState(note.label)
+    val latestValue by rememberUpdatedState(note.value)
+    DisposableEffect(note.id) {
+        onDispose {
+            if (latestLabelText != latestLabel || latestValueText != latestValue) {
+                onNoteChange(latestLabelText, latestValueText)
+            }
+        }
+    }
     
     Row(
         modifier = Modifier
@@ -140,9 +179,8 @@ private fun NoteItemRow(
         // 标签输入
         BasicTextField(
             value = labelText,
-            onValueChange = { 
+            onValueChange = {
                 labelText = it
-                onLabelChange(it)
             },
             modifier = Modifier
                 .weight(1f)
@@ -169,9 +207,8 @@ private fun NoteItemRow(
         // 值输入
         BasicTextField(
             value = valueText,
-            onValueChange = { 
+            onValueChange = {
                 valueText = it
-                onValueChange(it)
             },
             modifier = Modifier
                 .weight(1f)

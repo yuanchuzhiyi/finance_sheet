@@ -13,16 +13,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,11 +38,10 @@ import androidx.compose.ui.unit.dp
 import com.familyfinance.sheet.data.model.ReportItem
 import com.familyfinance.sheet.ui.theme.Indigo500
 import com.familyfinance.sheet.ui.theme.Rose500
-import com.familyfinance.sheet.ui.theme.Slate100
 import com.familyfinance.sheet.ui.theme.Slate300
 import com.familyfinance.sheet.ui.theme.Slate50
-import java.text.NumberFormat
-import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlin.math.absoluteValue
 
 /**
  * 科目行组件
@@ -60,10 +62,27 @@ fun ReportItemRow(
 ) {
     val hasChildren = !item.children.isNullOrEmpty()
     val displayValue = item.getValue(period)
+    val noteValue = item.getNote(period)
     var valueText by remember(displayValue) { 
-        mutableStateOf(if (displayValue == 0.0) "" else displayValue.toLong().toString())
+        mutableStateOf(formatNumberForInput(displayValue))
     }
-    var noteText by remember(item.note) { mutableStateOf(item.note ?: "") }
+    var noteText by remember(noteValue) { mutableStateOf(noteValue) }
+
+    LaunchedEffect(noteText, noteValue) {
+        delay(400)
+        if (noteText != noteValue) {
+            onNoteChange(noteText)
+        }
+    }
+    val latestNoteText by rememberUpdatedState(noteText)
+    val latestNoteValue by rememberUpdatedState(noteValue)
+    DisposableEffect(item.id, period) {
+        onDispose {
+            if (latestNoteText != latestNoteValue) {
+                onNoteChange(latestNoteText)
+            }
+        }
+    }
     
     Row(
         modifier = modifier
@@ -105,9 +124,8 @@ fun ReportItemRow(
         if (showNotes) {
             BasicTextField(
                 value = noteText,
-                onValueChange = { 
+                onValueChange = {
                     noteText = it
-                    onNoteChange(it)
                 },
                 modifier = Modifier
                     .weight(1f)
@@ -140,7 +158,11 @@ fun ReportItemRow(
             onValueChange = { newValue ->
                 val filtered = newValue.filter { it.isDigit() || it == '.' || it == '-' }
                 valueText = filtered
-                filtered.toDoubleOrNull()?.let { onValueChange(it) }
+                when {
+                    filtered.isBlank() -> onValueChange(0.0)
+                    filtered == "-" || filtered == "." || filtered == "-." -> Unit
+                    else -> filtered.toDoubleOrNull()?.let { onValueChange(it) }
+                }
             },
             modifier = Modifier
                 .weight(0.8f)
@@ -181,7 +203,7 @@ fun ReportItemRow(
                 modifier = Modifier.size(32.dp)
             ) {
                 Icon(
-                    imageVector = Icons.Default.PlaylistAdd,
+                    imageVector = Icons.AutoMirrored.Filled.PlaylistAdd,
                     contentDescription = "新增子科目",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
@@ -199,5 +221,14 @@ fun ReportItemRow(
                 )
             }
         }
+    }
+}
+
+private fun formatNumberForInput(value: Double): String {
+    if (value == 0.0) return ""
+    return if ((value % 1.0).absoluteValue < 0.0000001) {
+        value.toLong().toString()
+    } else {
+        value.toString().trimEnd('0').trimEnd('.')
     }
 }

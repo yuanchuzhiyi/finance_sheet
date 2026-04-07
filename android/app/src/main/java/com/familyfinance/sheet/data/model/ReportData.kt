@@ -20,7 +20,8 @@ data class NoteItem(
  * @property groups 综合分组（兼容旧逻辑）
  * @property flowGroups 按年/月统计的收支变动（income/expense）
  * @property balanceGroups 按日统计的资产状况（asset/liability）
- * @property notes 其他信息（不参与汇总）
+ * @property notesByPeriod 按周期存储的附注（不参与汇总）
+ * @property notes 旧版共享附注，保留用于兼容历史数据
  */
 @Serializable
 data class ReportData(
@@ -30,105 +31,62 @@ data class ReportData(
     val groups: List<CategoryGroup> = emptyList(),
     val flowGroups: List<CategoryGroup> = emptyList(),
     val balanceGroups: List<CategoryGroup> = emptyList(),
+    val notesByPeriod: Map<String, List<NoteItem>> = emptyMap(),
     val notes: List<NoteItem> = emptyList()
 ) {
     companion object {
         /**
-         * 创建默认报表数据
+         * 创建默认报表数据（包含默认分组，但不包含任何日期和值）
          */
         fun default(): ReportData {
-            val defaultPeriods = listOf("2025")
-            val defaultMonths = listOf("2025-01", "2025-02")
-            val defaultDays = listOf("2025-01-01")
+            val defaultPeriods = emptyList<String>()
+            val defaultMonths = emptyList<String>()
+            val defaultDays = emptyList<String>()
             
-            val flowGroups = listOf(
-                CategoryGroup(
-                    id = "income",
-                    type = CategoryType.INCOME,
-                    name = "收入 (Income)",
-                    items = listOf(
-                        ReportItem(
-                            id = "inc_1",
-                            name = "工资收入",
-                            values = mapOf("2025" to 240000.0, "2025-01" to 20000.0, "2025-02" to 20000.0)
-                        ),
-                        ReportItem(
-                            id = "inc_2",
-                            name = "公积金收入",
-                            values = mapOf("2025" to 6000.0, "2025-02" to 500.0)
-                        ),
-                        ReportItem(id = "inc_3", name = "股票投资收入"),
-                        ReportItem(id = "inc_4", name = "期货投资收入"),
-                        ReportItem(id = "inc_5", name = "黄金投资收入"),
-                        ReportItem(id = "inc_6", name = "白银投资收入"),
-                        ReportItem(id = "inc_7", name = "铑投资收入"),
-                        ReportItem(id = "inc_8", name = "加密货币投资收入"),
-                        ReportItem(id = "inc_9", name = "其他投资收入")
-                    )
-                ),
-                CategoryGroup(
-                    id = "expense",
-                    type = CategoryType.EXPENSE,
-                    name = "支出 (Expenses)",
-                    items = listOf(
-                        ReportItem(
-                            id = "exp_1",
-                            name = "房贷/房租",
-                            values = mapOf("2025" to 60000.0, "2025-01" to 5000.0, "2025-02" to 5000.0)
-                        ),
-                        ReportItem(
-                            id = "exp_2",
-                            name = "餐饮美食",
-                            values = mapOf("2025" to 36000.0, "2025-01" to 3000.0, "2025-02" to 2800.0)
-                        ),
-                        ReportItem(
-                            id = "exp_3",
-                            name = "交通出行",
-                            values = mapOf("2025" to 9600.0, "2025-02" to 800.0)
-                        )
-                    )
-                )
-            )
-            
-            val balanceGroups = listOf(
+            // 创建默认的资产负债表分组（资产和负债）
+            val defaultBalanceGroups = listOf(
                 CategoryGroup(
                     id = "asset",
                     type = CategoryType.ASSET,
                     name = "资产 (Assets)",
-                    items = listOf(
-                        ReportItem(id = "ast_cash", name = "现金", values = mapOf("2025-01-01" to 20000.0)),
-                        ReportItem(id = "ast_recv", name = "应收借款", values = mapOf("2025-01-01" to 50000.0)),
-                        ReportItem(id = "ast_int", name = "累计利息", values = mapOf("2025-01-01" to 500.0)),
-                        ReportItem(id = "ast_gold", name = "黄金资产", values = mapOf("2025-01-01" to 50000.0)),
-                        ReportItem(id = "ast_stock", name = "股票资产", values = mapOf("2025-01-01" to 110000.0)),
-                        ReportItem(id = "ast_rhod", name = "铑实物", values = mapOf("2025-01-01" to 30000.0)),
-                        ReportItem(id = "ast_crypto", name = "加密货币", values = mapOf("2025-01-01" to 38000.0)),
-                        ReportItem(id = "ast_fund", name = "公积金", values = mapOf("2025-01-01" to 78000.0)),
-                        ReportItem(id = "ast_savegold", name = "积存金", values = mapOf("2025-01-01" to 15000.0)),
-                        ReportItem(id = "ast_futures", name = "期货资产", values = mapOf("2025-01-01" to 24000.0))
-                    )
+                    items = emptyList()
                 ),
                 CategoryGroup(
                     id = "liability",
                     type = CategoryType.LIABILITY,
                     name = "负债 (Liabilities)",
-                    items = listOf(
-                        ReportItem(id = "lia_card", name = "信用卡未还", values = mapOf("2025-01-01" to 2500.0)),
-                        ReportItem(id = "lia_debt", name = "欠款", values = mapOf("2025-01-01" to 50000.0))
-                    )
+                    items = emptyList()
                 )
             )
+            
+            // 创建默认的利润表分组（收入和支出）
+            val defaultFlowGroups = listOf(
+                CategoryGroup(
+                    id = "income",
+                    type = CategoryType.INCOME,
+                    name = "收入 (Income)",
+                    items = emptyList()
+                ),
+                CategoryGroup(
+                    id = "expense",
+                    type = CategoryType.EXPENSE,
+                    name = "支出 (Expenses)",
+                    items = emptyList()
+                )
+            )
+            
+            // 合并所有分组
+            val allGroups = defaultBalanceGroups + defaultFlowGroups
             
             return ReportData(
                 years = defaultPeriods,
                 months = defaultMonths,
                 days = defaultDays,
-                groups = flowGroups + balanceGroups,
-                flowGroups = flowGroups,
-                balanceGroups = balanceGroups,
-                notes = listOf(
-                    NoteItem(id = "note_1", label = "养老保险总缴纳额", value = "200000")
-                )
+                groups = allGroups,
+                flowGroups = defaultFlowGroups,
+                balanceGroups = defaultBalanceGroups,
+                notesByPeriod = emptyMap(),
+                notes = emptyList()
             )
         }
     }
@@ -173,15 +131,103 @@ data class ReportData(
     
     /**
      * 获取显示的分组
+     * 确保返回的分组都在实际数据中，以便更新操作能正常工作
      */
     fun getDisplayGroups(viewMode: ViewMode): List<CategoryGroup> {
-        return when (viewMode) {
+        val result = when (viewMode) {
             ViewMode.DAY -> balanceGroups.ifEmpty {
                 groups.filter { it.type == CategoryType.ASSET || it.type == CategoryType.LIABILITY }
             }
             else -> flowGroups.ifEmpty {
                 groups.filter { it.type == CategoryType.INCOME || it.type == CategoryType.EXPENSE }
             }
+        }
+        
+        // 如果结果为空，返回空列表（不再创建新对象）
+        // 实际数据会在 ensureDefaultGroups() 中创建
+        return result
+    }
+    
+    /**
+     * 获取当前视图可用的周期选项
+     */
+    fun getPeriods(viewMode: ViewMode): List<String> {
+        return when (viewMode) {
+            ViewMode.YEAR -> years
+            ViewMode.MONTH -> months
+            ViewMode.DAY -> days
+        }.sortedDescending()
+    }
+    
+    /**
+     * 确保数据中包含必要的默认分组
+     * 如果 balanceGroups 或 flowGroups 为空，添加默认分组
+     */
+    fun ensureDefaultGroups(): ReportData {
+        var updatedBalanceGroups = balanceGroups
+        var updatedFlowGroups = flowGroups
+        var updatedGroups = groups.toMutableList()
+        
+        // 确保有资产和负债分组
+        if (balanceGroups.isEmpty()) {
+            val assetGroup = CategoryGroup(
+                id = "asset",
+                type = CategoryType.ASSET,
+                name = "资产 (Assets)",
+                items = emptyList()
+            )
+            val liabilityGroup = CategoryGroup(
+                id = "liability",
+                type = CategoryType.LIABILITY,
+                name = "负债 (Liabilities)",
+                items = emptyList()
+            )
+            updatedBalanceGroups = listOf(assetGroup, liabilityGroup)
+            
+            // 如果 groups 中也没有这些分组，添加到 groups
+            if (!groups.any { it.id == "asset" }) {
+                updatedGroups.add(assetGroup)
+            }
+            if (!groups.any { it.id == "liability" }) {
+                updatedGroups.add(liabilityGroup)
+            }
+        }
+        
+        // 确保有收入和支出分组
+        if (flowGroups.isEmpty()) {
+            val incomeGroup = CategoryGroup(
+                id = "income",
+                type = CategoryType.INCOME,
+                name = "收入 (Income)",
+                items = emptyList()
+            )
+            val expenseGroup = CategoryGroup(
+                id = "expense",
+                type = CategoryType.EXPENSE,
+                name = "支出 (Expenses)",
+                items = emptyList()
+            )
+            updatedFlowGroups = listOf(incomeGroup, expenseGroup)
+            
+            // 如果 groups 中也没有这些分组，添加到 groups
+            if (!groups.any { it.id == "income" }) {
+                updatedGroups.add(incomeGroup)
+            }
+            if (!groups.any { it.id == "expense" }) {
+                updatedGroups.add(expenseGroup)
+            }
+        }
+        
+        return if (updatedBalanceGroups != balanceGroups || 
+                   updatedFlowGroups != flowGroups || 
+                   updatedGroups.size != groups.size) {
+            copy(
+                balanceGroups = updatedBalanceGroups,
+                flowGroups = updatedFlowGroups,
+                groups = updatedGroups
+            )
+        } else {
+            this
         }
     }
     
@@ -204,7 +250,7 @@ data class ReportData(
      */
     fun addDay(day: String): ReportData {
         if (days.contains(day)) return this
-        return copy(days = days + day)
+        return copy(days = (days + day).sortedDescending())
     }
     
     /**
@@ -212,7 +258,7 @@ data class ReportData(
      */
     fun addMonth(month: String): ReportData {
         if (months.contains(month)) return this
-        return copy(months = months + month)
+        return copy(months = (months + month).sortedDescending())
     }
     
     /**
@@ -220,28 +266,75 @@ data class ReportData(
      */
     fun addYear(year: String): ReportData {
         if (years.contains(year)) return this
-        return copy(years = years + year)
+        return copy(years = (years + year).sortedDescending())
     }
     
     /**
      * 添加附注
      */
-    fun addNote(note: NoteItem): ReportData {
-        return copy(notes = notes + note)
+    fun getNotes(period: String): List<NoteItem> {
+        return if (notesByPeriod.containsKey(period)) {
+            notesByPeriod[period].orEmpty()
+        } else {
+            notes
+        }
+    }
+    
+    /**
+     * 添加附注
+     */
+    fun addNote(period: String, note: NoteItem): ReportData {
+        if (period.isBlank()) return this
+        val updatedPeriodNotes = notesByPeriod.toMutableMap().apply {
+            val currentNotes = getNotes(period)
+            this[period] = currentNotes + note
+        }
+        return copy(notesByPeriod = updatedPeriodNotes)
     }
     
     /**
      * 更新附注
      */
-    fun updateNote(noteId: String, updater: (NoteItem) -> NoteItem): ReportData {
-        return copy(notes = notes.map { if (it.id == noteId) updater(it) else it })
+    fun updateNote(period: String, noteId: String, updater: (NoteItem) -> NoteItem): ReportData {
+        if (period.isBlank()) return this
+        val updatedPeriodNotes = notesByPeriod.toMutableMap().apply {
+            val currentNotes = getNotes(period)
+            this[period] = currentNotes.map { if (it.id == noteId) updater(it) else it }
+        }
+        return copy(notesByPeriod = updatedPeriodNotes)
     }
     
     /**
      * 删除附注
      */
-    fun removeNote(noteId: String): ReportData {
-        return copy(notes = notes.filter { it.id != noteId })
+    fun removeNote(period: String, noteId: String): ReportData {
+        if (period.isBlank()) return this
+        val updatedPeriodNotes = notesByPeriod.toMutableMap().apply {
+            val currentNotes = getNotes(period)
+            this[period] = currentNotes.filter { it.id != noteId }
+        }
+        return copy(notesByPeriod = updatedPeriodNotes)
+    }
+    
+    /**
+     * 获取汇总对比数据
+     */
+    fun getSummaryComparison(
+        viewMode: ViewMode,
+        currentPeriod: String,
+        comparisonPeriod: String
+    ): SummaryComparison? {
+        if (currentPeriod.isBlank() || comparisonPeriod.isBlank()) return null
+        val currentSummary = getSummary(viewMode, currentPeriod)
+        val comparisonSummary = getSummary(viewMode, comparisonPeriod)
+        return SummaryComparison(
+            income = compareMetric(currentSummary.income, comparisonSummary.income),
+            expense = compareMetric(currentSummary.expense, comparisonSummary.expense),
+            asset = compareMetric(currentSummary.asset, comparisonSummary.asset),
+            liability = compareMetric(currentSummary.liability, comparisonSummary.liability),
+            cashflow = compareMetric(currentSummary.cashflow, comparisonSummary.cashflow),
+            netWorth = compareMetric(currentSummary.netWorth, comparisonSummary.netWorth)
+        )
     }
 }
 
@@ -256,6 +349,37 @@ data class Summary(
     val cashflow: Double = 0.0,
     val netWorth: Double = 0.0
 )
+
+data class MetricComparison(
+    val currentValue: Double,
+    val comparisonValue: Double,
+    val delta: Double,
+    val percentChange: Double?
+)
+
+data class SummaryComparison(
+    val income: MetricComparison,
+    val expense: MetricComparison,
+    val asset: MetricComparison,
+    val liability: MetricComparison,
+    val cashflow: MetricComparison,
+    val netWorth: MetricComparison
+)
+
+fun compareMetric(currentValue: Double, comparisonValue: Double): MetricComparison {
+    val delta = currentValue - comparisonValue
+    val percentChange = when {
+        comparisonValue == 0.0 && currentValue == 0.0 -> 0.0
+        comparisonValue == 0.0 -> null
+        else -> delta / comparisonValue
+    }
+    return MetricComparison(
+        currentValue = currentValue,
+        comparisonValue = comparisonValue,
+        delta = delta,
+        percentChange = percentChange
+    )
+}
 
 /**
  * 视图模式
