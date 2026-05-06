@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.familyfinance.sheet.ui.navigation.MainNavigation
+import com.familyfinance.sheet.ui.screens.MainScreen
 import com.familyfinance.sheet.ui.theme.FamilyFinanceTheme
 
 class MainActivity : ComponentActivity() {
@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainNavigation()
+                    MainScreen()
                 }
             }
         }
