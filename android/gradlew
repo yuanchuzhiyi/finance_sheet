@@ -29,7 +29,7 @@ PRGDIR=$(dirname "$PRG")
 APP_HOME=$(cd "$PRGDIR/.." && pwd -P)
 
 # Download gradle if not available
-GRADLE_VERSION="8.5"
+GRADLE_VERSION="8.9"
 GRADLE_HOME="$HOME/.gradle/wrapper/dists/gradle-$GRADLE_VERSION-bin"
 
 if [ ! -d "$GRADLE_HOME" ]; then
