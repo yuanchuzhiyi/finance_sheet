@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android build artifacts
+android/.gradle/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/*.apk
+android/*.aab
+
+# iOS build artifacts
+ios/build/
+ios/DerivedData/
+**/xcuserdata/
+*.xcuserstate
+ios/Pods/
