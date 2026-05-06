@@ -94,11 +94,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     
     // 显示的分组
     val displayGroups: StateFlow<List<CategoryGroup>> = combine(
-        reportData, viewMode
-    ) { data, mode ->
-        data.getDisplayGroups(mode)
+        reportData, viewMode, currentPeriod
+    ) { data, mode, period ->
+        data.getDisplayGroups(mode, period)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    
+
+    /** 当前视图模式下，对比期对应的分组（按 ID 与 displayGroups 一一对应）。 */
+    val comparisonGroups: StateFlow<List<CategoryGroup>> = combine(
+        reportData, viewMode, comparisonPeriod
+    ) { data, mode, period ->
+        if (period.isBlank()) emptyList() else data.getDisplayGroups(mode, period)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     init {
         // 初始化选中的周期
         viewModelScope.launch {
@@ -111,15 +118,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (_selectedDay.value.isEmpty() && data.days.isNotEmpty()) {
                     _selectedDay.value = data.days.maxOrNull().orEmpty()
-                }
-                
-                // 如果数据中没有默认分组，自动创建并保存
-                val displayGroups = data.getDisplayGroups(_viewMode.value)
-                if (displayGroups.isEmpty()) {
-                    val updatedData = data.ensureDefaultGroups()
-                    if (updatedData != data) {
-                        repository.saveReportData(updatedData)
-                    }
                 }
             }
         }
@@ -174,14 +172,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return false
         }
         viewModelScope.launch {
-            val newData = data.addDay(day)
+            val newData = data.addDay(day, sourcePeriod = _selectedDay.value.takeIf { it.isNotBlank() })
             repository.saveReportData(newData)
             _selectedDay.value = day
             _viewMode.value = ViewMode.DAY
         }
         return true
     }
-    
+
     // 添加月份
     fun addMonth(month: String): Boolean {
         val data = reportData.value
@@ -192,14 +190,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return false
         }
         viewModelScope.launch {
-            val newData = data.addMonth(month)
+            val newData = data.addMonth(month, sourcePeriod = _selectedMonth.value.takeIf { it.isNotBlank() })
             repository.saveReportData(newData)
             _selectedMonth.value = month
             _viewMode.value = ViewMode.MONTH
         }
         return true
     }
-    
+
     // 添加年份
     fun addYear(year: String): Boolean {
         val data = reportData.value
@@ -210,56 +208,57 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return false
         }
         viewModelScope.launch {
-            val newData = data.addYear(year)
+            val newData = data.addYear(year, sourcePeriod = _selectedYear.value.takeIf { it.isNotBlank() })
             repository.saveReportData(newData)
             _selectedYear.value = year
             _viewMode.value = ViewMode.YEAR
         }
         return true
     }
-    
-    // 添加科目
+
+    // 添加科目（仅添加到当前期；其它期不受影响）
     fun addItem(groupId: String, name: String) {
+        val period = currentPeriod.value
+        if (period.isBlank()) return
         viewModelScope.launch {
-            var data = reportData.value
-            // 确保数据中有默认分组，这样 updateGroup 才能找到它们
-            data = data.ensureDefaultGroups()
-            
-            val allPeriods = data.years + data.months + data.days
+            val data = reportData.value
             val newItem = ReportItem(
                 id = "${groupId}_${System.currentTimeMillis()}",
                 name = name,
-                values = allPeriods.associateWith { 0.0 }
+                values = mapOf(period to 0.0)
             )
-            val newData = data.updateGroup(groupId) { group ->
+            val newData = data.updateGroup(period, groupId) { group ->
                 group.addItem(newItem)
             }
             repository.saveReportData(newData)
         }
     }
-    
-    // 添加子科目
+
+    // 添加子科目（仅添加到当前期）
     fun addSubItem(groupId: String, parentId: String, name: String) {
+        val period = currentPeriod.value
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val allPeriods = data.years + data.months + data.days
             val newItem = ReportItem(
                 id = "${parentId}_${System.currentTimeMillis()}",
                 name = name,
-                values = allPeriods.associateWith { 0.0 }
+                values = mapOf(period to 0.0)
             )
-            val newData = data.updateGroup(groupId) { group ->
+            val newData = data.updateGroup(period, groupId) { group ->
                 group.addSubItem(parentId, newItem)
             }
             repository.saveReportData(newData)
         }
     }
-    
-    // 重命名科目
+
+    // 重命名科目（仅当前期）
     fun renameItem(groupId: String, itemId: String, newName: String) {
+        val period = currentPeriod.value
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val newData = data.updateGroup(groupId) { group ->
+            val newData = data.updateGroup(period, groupId) { group ->
                 group.updateItem(itemId) { item ->
                     item.rename(newName)
                 }
@@ -267,23 +266,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.saveReportData(newData)
         }
     }
-    
-    // 删除科目
+
+    // 删除科目（仅当前期）
     fun deleteItem(groupId: String, itemId: String) {
+        val period = currentPeriod.value
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val newData = data.updateGroup(groupId) { group ->
+            val newData = data.updateGroup(period, groupId) { group ->
                 group.removeItem(itemId)
             }
             repository.saveReportData(newData)
         }
     }
-    
+
     // 更新科目值
     fun updateItemValue(groupId: String, itemId: String, period: String, value: Double) {
+        if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val newData = data.updateGroup(groupId) { group ->
+            val newData = data.updateGroup(period, groupId) { group ->
                 group.updateItem(itemId) { item ->
                     item.updateValue(period, value)
                 }
@@ -291,13 +293,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             repository.saveReportData(newData)
         }
     }
-    
+
     // 更新科目备注
     fun updateItemNote(groupId: String, itemId: String, period: String, note: String) {
         if (period.isBlank()) return
         viewModelScope.launch {
             val data = reportData.value
-            val newData = data.updateGroup(groupId) { group ->
+            val newData = data.updateGroup(period, groupId) { group ->
                 group.updateItem(itemId) { item ->
                     item.updateNote(period, note)
                 }

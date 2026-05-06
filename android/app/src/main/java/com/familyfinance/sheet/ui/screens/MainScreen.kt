@@ -86,6 +86,7 @@ fun MainScreen(
     val summary by viewModel.summary.collectAsState()
     val summaryComparison by viewModel.summaryComparison.collectAsState()
     val displayGroups by viewModel.displayGroups.collectAsState()
+    val comparisonGroups by viewModel.comparisonGroups.collectAsState()
     val showNotes by viewModel.showNotes.collectAsState()
     
     val snackbarHostState = remember { SnackbarHostState() }
@@ -383,10 +384,14 @@ fun MainScreen(
             
             // 分类组
             items(displayGroups, key = { it.id }) { group ->
+                val comparisonTotal = if (comparisonPeriod.isNotBlank()) {
+                    comparisonGroups.firstOrNull { it.id == group.id }?.getTotal(comparisonPeriod) ?: 0.0
+                } else null
                 CategoryGroupSection(
                     group = group,
                     period = currentPeriod,
                     comparisonPeriod = comparisonPeriod,
+                    comparisonTotal = comparisonTotal,
                     showNotes = showNotes,
                     onAddItem = { showAddItemDialog = group.id },
                     onValueChange = { itemId, value ->

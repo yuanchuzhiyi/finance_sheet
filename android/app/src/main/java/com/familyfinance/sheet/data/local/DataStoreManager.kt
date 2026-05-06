@@ -39,7 +39,7 @@ class DataStoreManager(private val context: Context) {
      */
     val reportDataFlow: Flow<ReportData> = context.dataStore.data.map { preferences ->
         val jsonString = preferences[REPORT_DATA_KEY]
-        if (jsonString != null) {
+        val decoded = if (jsonString != null) {
             try {
                 json.decodeFromString<ReportData>(jsonString)
             } catch (e: Exception) {
@@ -51,6 +51,7 @@ class DataStoreManager(private val context: Context) {
             // 数据不存在时返回空数据，而不是默认模版
             ReportData.default()
         }
+        decoded.migrateToPerPeriodIfNeeded()
     }
     
     /**

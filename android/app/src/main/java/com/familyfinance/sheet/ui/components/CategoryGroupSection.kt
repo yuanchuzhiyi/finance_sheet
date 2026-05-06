@@ -48,6 +48,7 @@ fun CategoryGroupSection(
     group: CategoryGroup,
     period: String,
     comparisonPeriod: String,
+    comparisonTotal: Double?,
     showNotes: Boolean,
     onAddItem: () -> Unit,
     onValueChange: (String, Double) -> Unit,
@@ -175,12 +176,9 @@ fun CategoryGroupSection(
 
             val total = group.getTotal(period)
             val formattedTotal = NumberFormat.getNumberInstance(Locale.CHINA).format(total)
-            val comparison = comparisonPeriod.takeIf { it.isNotBlank() }?.let {
-                compareMetric(
-                    currentValue = total,
-                    comparisonValue = group.getTotal(it)
-                )
-            }
+            val comparison = if (comparisonPeriod.isNotBlank() && comparisonTotal != null) {
+                compareMetric(currentValue = total, comparisonValue = comparisonTotal)
+            } else null
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

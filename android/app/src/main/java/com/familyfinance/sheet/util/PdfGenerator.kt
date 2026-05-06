@@ -127,7 +127,7 @@ class PdfGenerator(private val context: Context) {
             yPos += 20f
             
             // 绘制分组数据
-            val displayGroups = reportData.getDisplayGroups(viewMode)
+            val displayGroups = reportData.getDisplayGroups(viewMode, period)
             for (group in displayGroups) {
                 yPos = drawCategoryGroup(canvas, yPos, group, period)
                 yPos += 15f
